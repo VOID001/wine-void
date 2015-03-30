@@ -1205,6 +1205,39 @@ static void test_iocp_fileio(HANDLE h)
     CloseHandle( hPipeClt );
 }
 
+static void test_file_full_size_information(void)
+{
+    IO_STATUS_BLOCK io;
+    FILE_FS_FULL_SIZE_INFORMATION fsi;
+    FILE_FS_SIZE_INFORMATION fsi_2;
+    HANDLE h;
+    NTSTATUS res;
+
+    if(!(h = create_temp_file(0))) return ;
+
+    memset(&fsi,0,sizeof(fsi));
+    memset(&fsi_2,0,sizeof(fsi_2));
+    res = pNtQueryVolumeInformationFile(h, &io, &fsi, sizeof fsi, FileFsFullSizeInformation);
+    ok( res == STATUS_SUCCESS, "cannot get attributes, res %x\n", res);
+    res = pNtQueryVolumeInformationFile(h, &io, &fsi_2, sizeof fsi_2, FileFsSizeInformation);
+    ok( res == STATUS_SUCCESS, "cannot get attributes, res %x\n", res);
+    ok((fsi.TotalAllocationUnits.u.LowPart == fsi_2.TotalAllocationUnits.u.LowPart) && (fsi.TotalAllocationUnits.u.HighPart == 
+        fsi_2.TotalAllocationUnits.u.HighPart), "TotalAllocationUnits is incorrect\n");
+    ok((fsi.CallerAvailableAllocationUnits.u.HighPart == fsi_2.AvailableAllocationUnits.u.HighPart) && 
+        (fsi.CallerAvailableAllocationUnits.u.LowPart == fsi_2.AvailableAllocationUnits.u.LowPart), 
+        "CallerAvailableAllocationUnits is incorrect\n");
+    ok(fsi.SectorsPerAllocationUnit == fsi_2.SectorsPerAllocationUnit, "SectorsPerAllocationUnit is incorrect\n");
+    ok(fsi.BytesPerSector == fsi_2.BytesPerSector, "BytesPerSector is incorrect\n");
+
+    trace("TotalAllocationUnits %08x %08x\n", fsi.TotalAllocationUnits.u.HighPart, fsi.TotalAllocationUnits.u.LowPart);
+    trace("CallerAvailableAllocationUnits %08x %08x\n", fsi.CallerAvailableAllocationUnits.HighPart, fsi.CallerAvailableAllocationUnits.LowPart);
+    trace("ActualAvailableAllocationUnits %08x %08x\n", fsi.ActualAvailableAllocationUnits.HighPart, fsi.ActualAvailableAllocationUnits.LowPart);
+    trace("SectorsPerAllocationUnit %d\n", fsi.SectorsPerAllocationUnit);
+    trace("BytesPerSector(Human Readable) %d\n", fsi.BytesPerSector);
+
+    CloseHandle( h );
+}
+
 static void test_file_basic_information(void)
 {
     IO_STATUS_BLOCK io;
@@ -2732,6 +2765,7 @@ START_TEST(file)
     test_file_all_information();
     test_file_both_information();
     test_file_name_information();
+    test_file_full_size_information();
     test_file_all_name_information();
     test_file_disposition_information();
     test_query_volume_information_file();
