@@ -1238,6 +1238,28 @@ static void test_file_full_size_information(void)
     CloseHandle( h );
 }
 
+static void test_file_size_information(void)
+{
+    IO_STATUS_BLOCK io;
+    FILE_FS_SIZE_INFORMATION fsi;
+    HANDLE h;
+    NTSTATUS res;
+
+    if(!(h = create_temp_file(0))) return ;
+
+    memset(&fsi,0,sizeof(fsi));
+    res = pNtQueryVolumeInformationFile(h, &io, &fsi, sizeof fsi, FileFsSizeInformation);
+    ok( res == STATUS_SUCCESS, "cannot get attributes, res %x\n", res);
+
+    trace("TotalAllocationUnits %08x %08x\n", fsi.TotalAllocationUnits.HighPart, fsi.TotalAllocationUnits.LowPart);
+    trace("AvailableAllocationUnits %08x %08x\n", fsi.AvailableAllocationUnits.HighPart, fsi.AvailableAllocationUnits.LowPart);
+    trace("SectorsPerAllocationUnit %08x\n", fsi.SectorsPerAllocationUnit);
+    trace("BytesPerSector %08x\n", fsi.BytesPerSector);
+
+    CloseHandle( h );
+}
+
+
 static void test_file_basic_information(void)
 {
     IO_STATUS_BLOCK io;
@@ -2766,6 +2788,7 @@ START_TEST(file)
     test_file_both_information();
     test_file_name_information();
     test_file_full_size_information();
+    test_file_size_information();
     test_file_all_name_information();
     test_file_disposition_information();
     test_query_volume_information_file();
