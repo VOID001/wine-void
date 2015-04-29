@@ -1423,6 +1423,61 @@ static void test_file_both_information(void)
     CloseHandle( h );
 }
 
+static void test_file_link_information(void)
+{
+    static const WCHAR fooL[] = {'f','o','o',0};
+    WCHAR path[MAX_PATH];
+    WCHAR bufferW[MAX_PATH];
+    IO_STATUS_BLOCK io;
+    HANDLE dir,h;
+    FILE_LINK_INFORMATION fli;
+    OBJECT_ATTRIBUTES attr;
+    UNICODE_STRING nameW;
+    int res;
+    int size;
+
+    GetCurrentDirectoryW(MAX_PATH, path);
+    pRtlDosPathNameToNtPathName_U(path, &nameW, NULL, NULL);
+    trace("nameW: %s\n",wine_dbgstr_w(nameW.Buffer));
+    attr.Length = sizeof(attr);
+    attr.RootDirectory = NULL;
+    attr.ObjectName = &nameW;
+    attr.Attributes = OBJ_CASE_INSENSITIVE;
+    attr.SecurityDescriptor = NULL;
+    attr.SecurityQualityOfService = NULL;
+    res = pNtCreateFile(&dir, GENERIC_WRITE, &attr, &io, NULL, 0,FILE_SHARE_READ|FILE_SHARE_WRITE, FILE_OPEN, FILE_DIRECTORY_FILE, NULL, 0);
+    ok( !res, "Open %s failed %08x\n", wine_dbgstr_w(nameW.Buffer), res);
+    GetTempFileNameW(path, fooL, 0, bufferW);
+    pRtlDosPathNameToNtPathName_U(bufferW, &nameW, NULL, NULL);
+    attr.ObjectName = &nameW;
+    trace("bufferW: %s\n",wine_dbgstr_w(bufferW));
+    res = pNtCreateFile(&h, GENERIC_WRITE, &attr, &io, NULL, 0,FILE_SHARE_READ|FILE_SHARE_WRITE, FILE_OPEN, FILE_NON_DIRECTORY_FILE, NULL, 0);
+    ok( !res, "Open %s failed %08x\n", wine_dbgstr_w(nameW.Buffer), res);
+    
+    memset(&fli,0,sizeof(fli));
+    fli.ReplaceIfExists = TRUE;
+    fli.RootDirectory = NULL;
+    memcpy(fli.FileName,(PWSTR)bufferW,sizeof(bufferW));
+	ok( sizeof(bufferW) == MAX_PATH , "sizeof bufferW != MAXPATH,bufferW = %d, MAXPATH = %d", sizeof(bufferW), MAX_PATH);
+    trace("FileName: %s\n", wine_dbgstr_w(fli.FileName));
+    fli.FileNameLength = sizeof(bufferW);
+    size = sizeof(FILE_LINK_INFORMATION) + sizeof(bufferW);
+    res = pNtSetInformationFile(h, &io, &fli, size, FileLinkInformation);
+    ok ( res == STATUS_SUCCESS , "res expected STATUS_SUCCESS, got %08x\n",res);
+
+    /* Easy Version of FileLinkInformation Implement */
+    memset(&fli,0,sizeof(fli));
+    fli.ReplaceIfExists = TRUE;
+    fli.RootDirectory = NULL;
+    fli.FileNameLength = nameW.MaximumLength;
+    memcpy(fli.FileName,nameW.Buffer,nameW.MaximumLength);
+    trace("nameW2: %s\n", wine_dbgstr_w(nameW.Buffer));
+    trace("FileName2: %s\n", wine_dbgstr_w(fli.FileName));
+    size = sizeof(FILE_LINK_INFORMATION) + nameW.MaximumLength;
+    res = pNtSetInformationFile(h, &io, &fli, size, FileLinkInformation);
+    ok ( res == STATUS_SUCCESS , "res expected STATUS_SUCCESS, got %08x\n",res);
+}
+
 static void test_file_disposition_information(void)
 {
     char tmp_path[MAX_PATH], buffer[MAX_PATH + 16];
@@ -2809,4 +2864,5 @@ START_TEST(file)
     test_file_disposition_information();
     test_query_volume_information_file();
     test_query_attribute_information_file();
+    test_file_link_information();
 }
